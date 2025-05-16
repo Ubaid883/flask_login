@@ -1,9 +1,10 @@
-from flask import Flask, redirect, render_template, url_for, request
+from flask import Flask, redirect, render_template, url_for, request, session
 # To generate the password hash
 from werkzeug.security import check_password_hash, generate_password_hash
 import mysql.connector as sql
 
 app = Flask(__name__)
+app.secret_key = 'sgrtu444rufg'
 conn = sql.connect(host='localhost', user='root', password='', database='register')
 cur = conn.cursor()
 @app.route('/', methods=['GET','POST'])
@@ -31,8 +32,39 @@ def register():
             return render_template('register.html', msg= msg)
     return render_template('register.html')
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    return render_template ('login.html')
+    cur = conn.cursor(dictionary=True)
+    if request.method == 'POST':
+        useremail = request.form.get('email')
+        userpassword = request.form.get('password')
+
+        if not useremail or not userpassword:
+            return render_template('login.html', msg="Email and password are required")
+
+        cur.execute("SELECT * FROM login WHERE email=%s", (useremail,))
+        user = cur.fetchone()
+
+        if user and check_password_hash(user['password'], userpassword):
+            session['useremail'] = user['name']
+            return redirect(url_for('home'))
+        else:
+            msg = "Invalid Email or Password"
+            return render_template('login.html', msg=msg)
+
+    return render_template('login.html')
+
+
+@app.route('/home')
+def home():
+    if 'useremail' in session:
+        return render_template('home.html', username=session['useremail'])
+    return redirect(url_for('login'))
+@app.route('/logout')
+def logout():
+    session.pop('useremail', None)
+
+    return redirect(url_for('login'))    
+
 if __name__ == "__main__":
     app.run(debug=True)
